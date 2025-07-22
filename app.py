@@ -134,6 +134,22 @@ if uploaded_files:
     df = pd.DataFrame(resultats)
     st.success("Analyse terminée ✅")
     st.dataframe(df)
+ st.subheader("📊 Poids total de viande par facture")
+
+# Ne garde que les factures où de la viande a été détectée
+df_viande = df[df["Poids total viande (kg)"] > 0]
+
+if not df_viande.empty:
+    fig, ax = plt.subplots()
+    ax.bar(df_viande["Facture"], df_viande["Poids total viande (kg)"], color="#a30000")
+    ax.set_ylabel("Poids (kg)")
+    ax.set_xlabel("Facture")
+    ax.set_title("Poids total de viande détecté par facture")
+    plt.xticks(rotation=45, ha="right")
+    st.pyplot(fig)
+else:
+    st.info("Aucune viande détectée dans les factures téléchargées.")
+
 
     output = BytesIO()
     df.to_excel(output, index=False, engine="openpyxl")
