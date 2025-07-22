@@ -1,96 +1,34 @@
 import streamlit as st
 import pandas as pd
 import re
-import matplotlib.pyplot as plt
 from PyPDF2 import PdfReader
 from io import BytesIO
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
+# --------------------- CONFIGURATION ---------------------
 st.set_page_config(
     page_title="Invoicemeatreader – Analyse de viande",
     page_icon="🥩",
     layout="centered"
 )
 
+# --------------------- CONSTANTES ------------------------
 VIANDE_KEYWORDS = [
-    # génériques
-    "viande", "viandes", "produits carnés",
-
-    # types de viande
-    "boeuf", "bœuf", "veau", "porc", "poulet", "dinde", "canard", "agneau", "lapin", "gibier",
-    "cheval", "chevreau", "cailles", "pintade", "cochon", "charcuterie", "volaille", "volailles", "scampi"
-
-    # morceaux courants
-    "entrecôte", "côte", "côtelette", "filet", "rumsteck", "bavette", "aiguillette", "collier",
-    "jarret", "épaule", "jambon", "tranche", "steak", "escalope", "tournedos", "roti", "rôti",
-    "merguez", "chipolata", "saucisse", "saucisson", "lardon", "lardons", "andouillette", "boudin",
-
-    # préparations
+    "viande", "bœuf", "boeuf", "porc", "poulet", "agneau", "dinde", "canard",
+    "saucisse", "steak", "jambon", "charcuterie", "côte", "côtelette", "filet",
     "haché", "hachée", "hachées", "hachés", "viande hachée", "préparation hachée",
-    "boulettes", "burger", "pâté", "terrine", "mousse de foie", "foie", "rillettes", "bolognaise",
-    "cordon bleu", "nuggets", "pané", "panés", "panée", "brochette", "brochettes", "grillade",
-
-    # abréviations ou usages pros
-    "vh", "vhachée", "v. hachée", "v. haché", "b haché", "p haché", "ssteak", "steack", "bsteak",
-
-    # anglais (si tu reçois des factures étrangères)
-    "beef", "pork", "chicken", "lamb", "duck", "goose", "ham", "bacon", "sausage", "meat",
-    "turkey", "minced meat", "ground beef", "ground meat", "cold cuts"
-
-        # génériques
-    "viande", "viandes", "produits carnés",
-
-    # types de viande
-    "boeuf", "bœuf", "veau", "porc", "poulet", "dinde", "canard", "agneau", "lapin", "gibier",
-    "cheval", "chevreau", "cailles", "pintade", "cochon", "charcuterie", "volaille", "volailles",
-
-    # morceaux courants
-    "entrecôte", "côte", "côtelette", "filet", "rumsteck", "bavette", "aiguillette", "collier",
-    "jarret", "épaule", "jambon", "tranche", "steak", "escalope", "tournedos", "roti", "rôti",
-    "merguez", "chipolata", "saucisse", "saucisson", "lardon", "lardons", "andouillette", "boudin",
-
-    # préparations
-    "haché", "hachée", "hachées", "hachés", "viande hachée", "préparation hachée",
-    "boulettes", "burger", "pâté", "terrine", "mousse de foie", "foie", "rillettes", "bolognaise",
-    "cordon bleu", "nuggets", "pané", "panés", "panée", "brochette", "brochettes", "grillade",
-
-    # abréviations ou usages pros
-    "vh", "vhachée", "v. hachée", "v. haché", "b haché", "p haché", "ssteak", "steack", "bsteak",
-
-    # anglais (si tu reçois des factures étrangères)
-    "beef", "pork", "chicken", "lamb", "duck", "goose", "ham", "bacon", "sausage", "meat",
-    "turkey", "minced meat", "ground beef", "ground meat", "cold cuts"
-
-    # génériques
-    "vlees", "vleeswaren", "vleesproduct", "vleesproducten", "vers vlees",
-
-    # types d’animaux
-    "rund", "rundvlees", "kalfs", "kalfsvlees", "varken", "varkensvlees",
-    "kip", "kippenvlees", "kalkoen", "eend", "gans", "lam", "lamsvlees", "wild", "konijn", "paard",
-
-    # morceaux et types
-    "biefstuk", "entrecote", "filet", "kotelet", "koteletten", "ribstuk", "schenkel",
-    "karbonade", "rib", "gehakt", "gehaktbal", "hamburger", "lapje", "vleeslap", "vleesschijf",
-    "varkenshaasje", "ossenhaas", "braadstuk", "rollade", "stoofvlees", "stooflapje",
-
-    # préparations et charcuterie
-    "worst", "worsten", "saucijs", "saucijzen", "rookworst", "grillworst", "bloedworst",
-    "leverworst", "salami", "ham", "hesp", "hespen", "bacon", "spek", "spekreepjes", "lardons",
-    "paté", "terrine", "fricandon", "frikandel", "rundgehakt", "kipgehakt", "varkensgehakt",
-
-    # produits transformés
-    "kipnuggets", "cordon bleu", "kroket", "vleeskroket", "schnitzel", "spies", "brochette",
-    "vleesbrood", "stoofpot", "goulash", "vleessaus",
-
-    # abréviations ou termes commerciaux
-    "v gehakt", "r gehakt", "vlees gemengd", "g vlees", "mixgehakt", "vleesmix",
-
-    # anglais sur factures néerlandaises internationales
-    "beef", "pork", "chicken", "ham", "bacon", "sausage", "meat", "ground beef", "minced meat"
+    "nuggets", "brochette", "rôti", "ribs", "bacon", "lardons", "chipolata", "merguez"
 ]
 
+FACTEUR_CO2 = {
+    "bœuf": 27,
+    "porc": 12,
+    "volaille": 7,
+    "autre": 10
+}
 
-
-
+# ------------------ UTILITAIRES --------------------------
 def convertir_en_kg(texte):
     total = 0.0
     matches = re.findall(r'([\d\.,]+)\s*(kg|g)', texte.lower())
@@ -105,6 +43,16 @@ def convertir_en_kg(texte):
             total += nombre
     return total
 
+def deviner_type_viande(ligne):
+    ligne = ligne.lower()
+    if any(x in ligne for x in ["bœuf", "boeuf", "rumsteck", "entrecôte", "steak", "haché", "veau", "charolais"]):
+        return "bœuf"
+    elif any(x in ligne for x in ["porc", "saucisse", "jambon", "lardons", "ribs", "filet mignon"]):
+        return "porc"
+    elif any(x in ligne for x in ["poulet", "volaille", "dinde", "canard", "nuggets", "aiguillette"]):
+        return "volaille"
+    else:
+        return "autre"
 
 def analyser_facture(uploaded_file):
     reader = PdfReader(uploaded_file)
@@ -114,69 +62,86 @@ def analyser_facture(uploaded_file):
 
     poids_total = 0.0
     contient_viande = False
+    co2_par_type = defaultdict(float)
 
     for ligne in texte_complet.split("\n"):
         ligne_lower = ligne.lower()
         if any(mot in ligne_lower for mot in VIANDE_KEYWORDS):
             contient_viande = True
-            poids_total += convertir_en_kg(ligne_lower)
+            poids_ligne = convertir_en_kg(ligne_lower)
+            type_viande = deviner_type_viande(ligne_lower)
+            co2_par_type[type_viande] += poids_ligne * FACTEUR_CO2[type_viande]
+            poids_total += poids_ligne
 
-    return contient_viande, round(poids_total, 2)
+    return contient_viande, round(poids_total, 2), dict(co2_par_type)
 
-st.markdown("<h1 style='text-align: center;'>🥩 Invoicemeatreader</h1>", unsafe_allow_html=True)
-st.markdown(
-    """
+# ------------------ INTERFACE ----------------------------
+st.markdown("""
+    <h1 style='text-align: center;'>🥩 Invoicemeatreader</h1>
     <div style='text-align: center; font-size: 18px; color: #666;'>
-        Analyse automatique de vos factures PDF pour détecter la viande et calculer le poids total.
+        Analyse automatique de vos factures PDF pour détecter la viande et estimer l'impact carbone 🌿
     </div>
     <br>
-    """,
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
-with st.sidebar:
-    st.image("https://emojiapi.dev/api/v1/cut_of_meat/512.png", width=80)
-    st.header("⚙️ Options")
-    langue = st.selectbox("Langue des mots-clés", ["Français", "Néerlandais"])
-    show_details = st.checkbox("Afficher les lignes détectées", value=False)
-
-uploaded_files = st.file_uploader("Choisissez une ou plusieurs factures", type="pdf", accept_multiple_files=True)
+uploaded_files = st.file_uploader("📂 Déposez vos factures PDF ici", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
     resultats = []
+    co2_total_par_type = defaultdict(float)
+
     for fichier in uploaded_files:
-        contient, poids = analyser_facture(fichier)
+        contient, poids, co2_par_type = analyser_facture(fichier)
         resultats.append({
             "Facture": fichier.name,
             "Contient viande": "Oui" if contient else "Non",
             "Poids total viande (kg)": poids
         })
+        for type_viande, co2 in co2_par_type.items():
+            co2_total_par_type[type_viande] += co2
 
     df = pd.DataFrame(resultats)
-    st.success("Analyse terminée ✅")
+    st.success("Analyse terminée avec succès ✅")
     st.dataframe(df)
 
-    # 📊 Graphique
+    # ---------- Graphique ------------
     st.subheader("📊 Poids total de viande par facture")
     df_viande = df[df["Poids total viande (kg)"] > 0]
 
     if not df_viande.empty:
-        fig, ax = plt.subplots()
-        ax.bar(df_viande["Facture"], df_viande["Poids total viande (kg)"], color="#a30000")
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.bar(df_viande["Facture"], df_viande["Poids total viande (kg)"], color="#A30000")
         ax.set_ylabel("Poids (kg)")
         ax.set_xlabel("Facture")
         ax.set_title("Poids total de viande détecté par facture")
         plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
         st.pyplot(fig)
     else:
         st.info("Aucune viande détectée dans les factures téléchargées.")
 
-    # 📥 Bouton de téléchargement
+    # ----------- Sidebar CO2 ---------
+    with st.sidebar:
+        st.header("🌍 Empreinte carbone estimée")
+        total_co2 = sum(co2_total_par_type.values())
+
+        if total_co2 == 0:
+            st.info("Aucune viande détectée.")
+        else:
+            for type_v, co2 in co2_total_par_type.items():
+                st.markdown(f"**{type_v.capitalize()}** : {co2:.1f} kg CO₂e")
+            st.markdown("---")
+            st.success(f"**Total estimé : {total_co2:.1f} kg CO₂e**")
+            st.caption("Source : estimations ADEME")
+
+    # ---------- Export Excel -----------
     output = BytesIO()
     df.to_excel(output, index=False, engine="openpyxl")
     st.download_button(
-        label="📥 Télécharger le rapport Excel",
+        label="📅 Télécharger le rapport Excel",
         data=output.getvalue(),
-        file_name="résumé_viande.xlsx",
+        file_name="viande_factures.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+else:
+    st.info("Téléversez une ou plusieurs factures PDF pour commencer.")
