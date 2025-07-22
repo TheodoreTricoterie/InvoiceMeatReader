@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 from PyPDF2 import PdfReader
 from io import BytesIO
 
+st.set_page_config(
+    page_title="Invoicemeatreader – Analyse de viande",
+    page_icon="🥩",
+    layout="centered"
+)
+
 VIANDE_KEYWORDS = [
     # génériques
     "viande", "viandes", "produits carnés",
@@ -117,8 +123,16 @@ def analyser_facture(uploaded_file):
 
     return contient_viande, round(poids_total, 2)
 
-st.title("🧾 Analyse de factures : détection de viande et poids total")
-st.markdown("Déposez ici vos factures PDF pour détecter automatiquement la viande et calculer le poids total.")
+st.markdown("<h1 style='text-align: center;'>🥩 Invoicemeatreader</h1>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style='text-align: center; font-size: 18px; color: #666;'>
+        Analyse automatique de vos factures PDF pour détecter la viande et calculer le poids total.
+    </div>
+    <br>
+    """,
+    unsafe_allow_html=True
+)
 
 uploaded_files = st.file_uploader("Choisissez une ou plusieurs factures", type="pdf", accept_multiple_files=True)
 
