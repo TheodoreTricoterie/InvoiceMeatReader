@@ -134,6 +134,21 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.download_button(
+    label="📥 Télécharger le rapport Excel",
+    data=output.getvalue(),
+    file_name="viande_factures.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    help="Cliquez pour télécharger le fichier généré"
+)
+
+
+with st.sidebar:
+    st.image("https://emojiapi.dev/api/v1/cut_of_meat/512.png", width=80)
+    st.header("⚙️ Options")
+    langue = st.selectbox("Langue des mots-clés", ["Français", "Néerlandais"])
+    show_details = st.checkbox("Afficher les lignes détectées", value=False)
+
 uploaded_files = st.file_uploader("Choisissez une ou plusieurs factures", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
