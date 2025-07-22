@@ -134,7 +134,7 @@ if uploaded_files:
     df = pd.DataFrame(resultats)
     st.success("Analyse terminée ✅")
     st.dataframe(df)
- st.subheader("📊 Poids total de viande par facture")
+    st.subheader("📊 Poids total de viande par facture")
 
 # Ne garde que les factures où de la viande a été détectée
 df_viande = df[df["Poids total viande (kg)"] > 0]
