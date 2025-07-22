@@ -93,8 +93,8 @@ def analyser_facture(uploaded_file):
 # ------------------ INTERFACE ----------------------------
 st.markdown("""
     <h1 style='text-align: center;'>🥩 Invoicemeatreader</h1>
-    <div style='text-align: center; font-size: 18px; color: #666;'>
-        Analyse automatique de vos factures PDF pour détecter la viande et estimer l'impact carbone 🌿
+    <div style='text-align: center; font-size: 18px; color: # 555;'>
+        Analyse automatique de vos factures PDF pour détecter la viande et estimer l'impact carbone
     </div>
     <br>
 """, unsafe_allow_html=True)
