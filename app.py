@@ -104,22 +104,6 @@ if uploaded_files:
     st.success("Analyse terminée avec succès ✅")
     st.dataframe(df)
 
-    # ---------- Graphique ------------
-    st.subheader("📊 Poids total de viande par facture")
-    df_viande = df[df["Poids total viande (kg)"] > 0]
-
-    if not df_viande.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.bar(df_viande["Facture"], df_viande["Poids total viande (kg)"], color="#A30000")
-        ax.set_ylabel("Poids (kg)")
-        ax.set_xlabel("Facture")
-        ax.set_title("Poids total de viande détecté par facture")
-        plt.xticks(rotation=45, ha="right")
-        plt.tight_layout()
-        st.pyplot(fig)
-    else:
-        st.info("Aucune viande détectée dans les factures téléchargées.")
-
     # ----------- Sidebar CO2 ---------
     with st.sidebar:
         st.header("🌍 Empreinte carbone estimée")
