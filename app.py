@@ -28,6 +28,11 @@ FACTEUR_CO2 = {
     "autre": 10
 }
 
+LISTE_MAGASINS = [
+    "vds", "biofresh", "terra", "terroirist", "le bon pain",
+    "intermarché", "restofrais", "vendsyssel"
+]
+
 # ------------------ UTILITAIRES --------------------------
 def convertir_en_kg(texte):
     total = 0.0
@@ -54,12 +59,22 @@ def deviner_type_viande(ligne):
     else:
         return "autre"
 
+def detecter_magasin(texte):
+    lignes = texte.strip().split("\n")
+    for ligne in lignes[:10]:
+        ligne_lower = ligne.lower()
+        for magasin in LISTE_MAGASINS:
+            if magasin in ligne_lower:
+                return magasin.capitalize()
+    return "Magasin inconnu"
+
 def analyser_facture(uploaded_file):
     reader = PdfReader(uploaded_file)
     texte_complet = ""
     for page in reader.pages:
         texte_complet += page.extract_text() + "\n"
 
+    nom_magasin = detecter_magasin(texte_complet)
     poids_total = 0.0
     contient_viande = False
     co2_par_type = defaultdict(float)
@@ -73,7 +88,7 @@ def analyser_facture(uploaded_file):
             co2_par_type[type_viande] += poids_ligne * FACTEUR_CO2[type_viande]
             poids_total += poids_ligne
 
-    return contient_viande, round(poids_total, 2), dict(co2_par_type)
+    return nom_magasin, contient_viande, round(poids_total, 2), dict(co2_par_type)
 
 # ------------------ INTERFACE ----------------------------
 st.markdown("""
@@ -91,8 +106,9 @@ if uploaded_files:
     co2_total_par_type = defaultdict(float)
 
     for fichier in uploaded_files:
-        contient, poids, co2_par_type = analyser_facture(fichier)
+        magasin, contient, poids, co2_par_type = analyser_facture(fichier)
         resultats.append({
+            "Magasin": magasin,
             "Facture": fichier.name,
             "Contient viande": "Oui" if contient else "Non",
             "Poids total viande (kg)": poids
@@ -103,6 +119,23 @@ if uploaded_files:
     df = pd.DataFrame(resultats)
     st.success("Analyse terminée avec succès ✅")
     st.dataframe(df)
+
+    # ---------- Graphique par magasin ------------
+    st.subheader("📊 Poids total de viande par magasin")
+    df_viande = df[df["Poids total viande (kg)"] > 0]
+
+    if not df_viande.empty:
+        poids_par_magasin = df_viande.groupby("Magasin")["Poids total viande (kg)"].sum().sort_values(ascending=False)
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.bar(poids_par_magasin.index, poids_par_magasin.values, color="#a30000")
+        ax.set_ylabel("Poids (kg)")
+        ax.set_xlabel("Magasin")
+        ax.set_title("Poids total de viande détecté par magasin")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+        st.pyplot(fig)
+    else:
+        st.info("Aucune viande détectée dans les factures téléchargées.")
 
     # ----------- Sidebar CO2 ---------
     with st.sidebar:
