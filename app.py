@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import matplotlib.pyplot as plt
 from PyPDF2 import PdfReader
 from io import BytesIO
 
