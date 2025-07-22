@@ -1,0 +1,12 @@
+[theme]
+base="light"
+primaryColor="#A30000"  # rouge "viande"
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#F9F9F9"
+textColor="#262730"
+font="sans serif"
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
