@@ -63,12 +63,17 @@ def convertir_en_kg(texte):
 
 def deviner_type_viande(ligne):
     ligne = ligne.lower()
-    if any(x in ligne for x in ["bœuf", "boeuf", "rumsteck", "entrecôte", "steak", "haché", "veau", "charolais"]):
+
+    if any(mot in ligne for mot in keywords_boeuf):
         return "bœuf"
-    elif any(x in ligne for x in ["porc", "saucisse", "jambon", "lardons", "ribs", "filet mignon"]):
+    elif any(mot in ligne for mot in keywords_porc):
         return "porc"
-    elif any(x in ligne for x in ["poulet", "volaille", "dinde", "canard", "nuggets", "aiguillette"]):
+    elif any(mot in ligne for mot in keywords_volaille):
         return "volaille"
+    elif any(mot in ligne for mot in keywords_poisson):
+        return "poisson"
+    elif any(mot in ligne for mot in keywords_fruits_de_mer):
+        return "fruits de mer"
     else:
         return "autre"
 
