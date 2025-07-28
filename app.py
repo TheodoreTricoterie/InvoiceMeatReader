@@ -1,69 +1,52 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
-import re
-from PyPDF2 import PdfReader
-from io import BytesIO
 import matplotlib.pyplot as plt
-from collections import defaultdict
+from PyPDF2 import PdfReader
+import re
+import io
 
-# --------------------- CONFIGURATION ---------------------
-st.set_page_config(
-    page_title="Invoicemeatreader – Analyse de viande",
-    page_icon="🥩",
-    layout="centered"
-)
+# ↑ Listes de mots-clés par type de produit animal
+keywords_boeuf = [
+    "boeuf", "bœuf", "veau", "entrecôte", "côte de boeuf", "viande hachée", "steak",
+    "steak haché", "charolais", "limousine", "joue de boeuf", "rôti de boeuf",
+    "pot-au-feu", "rumsteck", "bourguignon", "paleron", "filet boeuf"
+]
 
-# --------------------- CONSTANTES ------------------------
-VIANDE_KEYWORDS = [
-    "viande", "bœuf", "boeuf", "porc", "poulet", "agneau", "dinde", "canard",
-    "saucisse", "steak", "jambon", "charcuterie", "côte", "côtelette", "filet",
-    "haché", "hachée", "hachées", "hachés", "viande hachée", "préparation hachée",
-    "nuggets", "brochette", "rôti", "ribs", "bacon", "lardons", "chipolata", "merguez"
+keywords_porc = [
+    "porc", "cochon", "jambon", "lard", "saucisse", "chipolata", "rôti de porc",
+    "côte de porc", "saucisson", "andouillette", "travers de porc", "filet mignon"
+]
+
+keywords_volaille = [
+    "poulet", "dinde", "canard", "oie", "pintade", "coquelet", "volaille",
+    "filet de poulet", "aile de poulet", "magret", "cuisses de canard", "escalope de dinde"
 ]
 
 keywords_poisson = [
-    "saumon", "cabillaud", "colin", "thon", "bar", "merlu", "lotte",
-    "dorade", "truite", "espadon", "maquereau", "hareng", "poisson", "filet de poisson"
+    "poisson", "saumon", "cabillaud", "colin", "thon", "bar", "merlu", "lotte",
+    "dorade", "truite", "espadon", "maquereau", "hareng", "filet de poisson", "morue", "lieu"
 ]
 
 keywords_fruits_de_mer = [
-    "crevette", "moule", "coquille", "coquille saint-jacques", "huitre",
+    "crevette", "crevettes", "moule", "moules", "coquille saint-jacques", "huitre", "huîtres",
     "palourde", "crabe", "langoustine", "homard", "bulot", "tourteau", "fruits de mer"
 ]
 
-FACTEUR_CO2 = {
+# Coefficients CO2 estimés en kg CO2 / kg produit
+co2_coeffs = {
     "bœuf": 27,
-    "porc": 12,
-    "volaille": 7,
-    "autre": 10,
-    "Poisson": 5,
-    "Fruits de mer": 10
+    "porc": 6,
+    "volaille": 5,
+    "poisson": 5,
+    "fruits de mer": 10
 }
 
-LISTE_MAGASINS = [
-    "vds", "biofresh", "terra", "terroirist", "le bon pain",
-    "intermarché", "restofrais", "vendsyssel"
-]
-
-
-# ------------------ UTILITAIRES --------------------------
-def convertir_en_kg(texte):
-    total = 0.0
-    matches = re.findall(r'([\d\.,]+)\s*(kg|g)', texte.lower())
-    for nombre, unite in matches:
-        try:
-            nombre = float(nombre.replace(",", "."))
-        except ValueError:
-            continue
-        if unite == "g":
-            total += nombre / 1000.0
-        elif unite == "kg":
-            total += nombre
-    return total
+# ↑ Extraction du type de produit
 
 def deviner_type_viande(ligne):
     ligne = ligne.lower()
-
     if any(mot in ligne for mot in keywords_boeuf):
         return "bœuf"
     elif any(mot in ligne for mot in keywords_porc):
@@ -77,106 +60,72 @@ def deviner_type_viande(ligne):
     else:
         return "autre"
 
-def detecter_magasin(texte):
-    lignes = texte.strip().split("\n")
-    for ligne in lignes[:10]:
-        ligne_lower = ligne.lower()
-        for magasin in LISTE_MAGASINS:
-            if magasin in ligne_lower:
-                return magasin.capitalize()
-    return "Magasin inconnu"
+# ↑ Extraction du poids en kg depuis une ligne
 
-def analyser_facture(uploaded_file):
-    reader = PdfReader(uploaded_file)
-    texte_complet = ""
+def convertir_en_kg(ligne):
+    poids = re.findall(r"(\d+[\.,]?\d*)\s?(kg|g)", ligne, re.IGNORECASE)
+    total = 0.0
+    for match in poids:
+        nombre, unite = match
+        try:
+            valeur = float(nombre.replace(",", "."))
+            if unite.lower() == "g":
+                valeur = valeur / 1000.0
+            total += valeur
+        except ValueError:
+            pass
+    return total
+
+# ↑ Analyse d'une facture (PDF)
+
+def analyser_facture(pdf_file):
+    reader = PdfReader(pdf_file)
+    lignes = []
     for page in reader.pages:
-        texte_complet += page.extract_text() + "\n"
+        texte = page.extract_text()
+        if texte:
+            lignes.extend(texte.split("\n"))
 
-    nom_magasin = detecter_magasin(texte_complet)
-    poids_total = 0.0
-    contient_viande = False
-    co2_par_type = defaultdict(float)
+    data = []
+    for ligne in lignes:
+        type_viande = deviner_type_viande(ligne)
+        poids = convertir_en_kg(ligne)
+        if type_viande != "autre" and poids > 0:
+            data.append((type_viande, poids))
 
-    for ligne in texte_complet.split("\n"):
-        ligne_lower = ligne.lower()
-        if any(mot in ligne_lower for mot in VIANDE_KEYWORDS):
-            contient_viande = True
-            poids_ligne = convertir_en_kg(ligne_lower)
-            type_viande = deviner_type_viande(ligne_lower)
-            co2_par_type[type_viande] += poids_ligne * FACTEUR_CO2[type_viande]
-            poids_total += poids_ligne
+    df = pd.DataFrame(data, columns=["Type", "Poids (kg)"])
+    return df.groupby("Type")["Poids (kg)"].sum().reset_index()
 
-    return nom_magasin, contient_viande, round(poids_total, 2), dict(co2_par_type)
+# ↑ Interface Streamlit
 
-# ------------------ INTERFACE ----------------------------
-st.markdown("""
-    <h1 style='text-align: center;'>🥩 Invoicemeatreader</h1>
-    <div style='text-align: center; font-size: 18px; color: # 555;'>
-        Analyse automatique de vos factures PDF pour détecter la viande et estimer l'impact carbone
-    </div>
-    <br>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Invoicemeatreader", layout="wide")
+st.title("🥩 Invoicemeatreader – Analyse de l'impact CO2 des achats alimentaires")
 
-uploaded_files = st.file_uploader("📂 Déposez vos factures PDF ici", type="pdf", accept_multiple_files=True)
+uploaded_file = st.file_uploader("✔ Téléverser une facture au format PDF", type="pdf")
 
-if uploaded_files:
-    resultats = []
-    co2_total_par_type = defaultdict(float)
+if uploaded_file:
+    st.success("Fichier bien reçu, analyse en cours...")
+    df_resultats = analyser_facture(uploaded_file)
 
-    for fichier in uploaded_files:
-        magasin, contient, poids, co2_par_type = analyser_facture(fichier)
-        resultats.append({
-            "Magasin": magasin,
-            "Facture": fichier.name,
-            "Contient viande": "Oui" if contient else "Non",
-            "Poids total viande (kg)": poids
-        })
-        for type_viande, co2 in co2_par_type.items():
-            co2_total_par_type[type_viande] += co2
+    if not df_resultats.empty:
+        # Calcul CO2
+        df_resultats["CO2 estimé (kg)"] = df_resultats.apply(
+            lambda row: row["Poids (kg)"] * co2_coeffs.get(row["Type"], 0), axis=1
+        )
 
-    df = pd.DataFrame(resultats)
-    st.success("Analyse terminée avec succès ✅")
-    st.dataframe(df)
+        st.subheader("📊 Résultats de l'analyse")
+        st.dataframe(df_resultats)
 
-    # ---------- Graphique par magasin ------------
-    st.subheader("📊 Poids total de viande par magasin")
-    df_viande = df[df["Poids total viande (kg)"] > 0]
-
-    if not df_viande.empty:
-        poids_par_magasin = df_viande.groupby("Magasin")["Poids total viande (kg)"].sum().sort_values(ascending=False)
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.bar(poids_par_magasin.index, poids_par_magasin.values, color="#a30000")
-        ax.set_ylabel("Poids (kg)")
-        ax.set_xlabel("Magasin")
-        ax.set_title("Poids total de viande détecté par magasin")
-        plt.xticks(rotation=45, ha="right")
-        plt.tight_layout()
+        # Graphique
+        fig, ax = plt.subplots()
+        ax.bar(df_resultats["Type"], df_resultats["CO2 estimé (kg)"])
+        ax.set_ylabel("CO2 estimé (kg)")
+        ax.set_title("Empreinte carbone estimée par type de produit")
         st.pyplot(fig)
+
+        st.sidebar.subheader("🌍 Estimation CO2 totale")
+        total_co2 = df_resultats["CO2 estimé (kg)"].sum()
+        st.sidebar.metric("Total CO2 estimé", f"{total_co2:.2f} kg")
+
     else:
-        st.info("Aucune viande détectée dans les factures téléchargées.")
-
-    # ----------- Sidebar CO2 ---------
-    with st.sidebar:
-        st.header("🌍 Empreinte carbone estimée")
-        total_co2 = sum(co2_total_par_type.values())
-
-        if total_co2 == 0:
-            st.info("Aucune viande détectée.")
-        else:
-            for type_v, co2 in co2_total_par_type.items():
-                st.markdown(f"**{type_v.capitalize()}** : {co2:.1f} kg CO₂e")
-            st.markdown("---")
-            st.success(f"**Total estimé : {total_co2:.1f} kg CO₂e**")
-            st.caption("Source : estimations ADEME")
-
-    # ---------- Export Excel -----------
-    output = BytesIO()
-    df.to_excel(output, index=False, engine="openpyxl")
-    st.download_button(
-        label="📅 Télécharger le rapport Excel",
-        data=output.getvalue(),
-        file_name="viande_factures.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-else:
-    st.info("Téléversez une ou plusieurs factures PDF pour commencer.")
+        st.warning("Aucune viande, poisson ou fruit de mer détecté.")
