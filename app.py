@@ -21,17 +21,30 @@ VIANDE_KEYWORDS = [
     "nuggets", "brochette", "rôti", "ribs", "bacon", "lardons", "chipolata", "merguez"
 ]
 
+keywords_poisson = [
+    "saumon", "cabillaud", "colin", "thon", "bar", "merlu", "lotte",
+    "dorade", "truite", "espadon", "maquereau", "hareng", "poisson", "filet de poisson"
+]
+
+keywords_fruits_de_mer = [
+    "crevette", "moule", "coquille", "coquille saint-jacques", "huitre",
+    "palourde", "crabe", "langoustine", "homard", "bulot", "tourteau", "fruits de mer"
+]
+
 FACTEUR_CO2 = {
     "bœuf": 27,
     "porc": 12,
     "volaille": 7,
-    "autre": 10
+    "autre": 10,
+    "Poisson": 5,
+    "Fruits de mer": 10
 }
 
 LISTE_MAGASINS = [
     "vds", "biofresh", "terra", "terroirist", "le bon pain",
     "intermarché", "restofrais", "vendsyssel"
 ]
+
 
 # ------------------ UTILITAIRES --------------------------
 def convertir_en_kg(texte):
